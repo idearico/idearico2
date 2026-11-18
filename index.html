@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>메뉴 추천 | 오늘 점심 뭐먹지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 휴대전화는 조건 → 버튼 → 결과 한 줄, PC(960px 이상)는 왼쪽 조건 / 오른쪽 결과 2단 */
+:root {
+  --bg: #F6F7F1; --surface: #FFFFFF; --ink: #18241C; --muted: #4E5B52; --line: #D6DCCF;
+  --accent: #1E5A3A; --accent-ink: #FFFFFF; --yolk: #F3C33B; --yolk-soft: #FDF3D3; --yolk-line: #E6C25A;
+  --band: #E9EDE0; --ph: #EEF1E8;
+  --font-display: "Black Han Sans", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  color-scheme: light;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121A15; --surface: #1A241E; --ink: #EEF2EA; --muted: #B3BEB5; --line: #2F3B33;
+    --accent: #7FCB9C; --accent-ink: #0E1A13; --yolk: #F3C33B; --yolk-soft: #33301C; --yolk-line: #8A7330;
+    --band: #18221B; --ph: #1F2A23; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121A15; --surface: #1A241E; --ink: #EEF2EA; --muted: #B3BEB5; --line: #2F3B33;
+  --accent: #7FCB9C; --accent-ink: #0E1A13; --yolk: #F3C33B; --yolk-soft: #33301C; --yolk-line: #8A7330;
+  --band: #18221B; --ph: #1F2A23; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; animation: none !important; } }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 1.15rem; line-height: 1.7;
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+[hidden] { display: none !important; }
+.wrap {
+  max-width: 72rem; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (min-width: 640px) { .wrap { padding-left: max(32px, env(safe-area-inset-left, 0px)); padding-right: max(32px, env(safe-area-inset-right, 0px)); } }
+h1, h2 { font-family: var(--font-display); font-weight: 400; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h3 { margin: 0; }
+p { margin: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--yolk); outline-offset: 3px; }
+
+/* 머리 (홈페이지와 같은 메뉴) */
+.top { padding-block: 1.1rem; border-bottom: 1px solid var(--line); }
+.top-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 2rem; }
+.brand { font-family: var(--font-display); font-size: 1.5rem; color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; gap: .6rem; }
+.brand .dot { width: .85rem; height: .85rem; border-radius: 50%; background: var(--yolk); box-shadow: 0 0 0 .3rem color-mix(in srgb, var(--yolk) 30%, transparent); }
+.nav { display: flex; flex-wrap: wrap; gap: .15rem; margin-left: -.8rem; }
+@media (min-width: 640px) { .nav { margin-left: 0; } }
+.nav a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 .8rem; border-radius: 999px; font-size: 1.05rem; font-weight: 500; color: var(--ink); text-decoration: none; }
+.nav a:hover { background: var(--band); }
+.nav a[aria-current="page"] { background: var(--ph); color: var(--accent); font-weight: 700; box-shadow: inset 0 0 0 2px var(--line); }
+
+/* 본문 */
+main { padding-block: clamp(1.5rem, 4vw, 3rem) clamp(3rem, 6vw, 5rem); }
+.intro { display: flex; flex-direction: column; gap: .5rem; margin-bottom: clamp(1.25rem, 3vw, 2rem); }
+.intro h1 { font-size: clamp(1.9rem, 4.5vw, 2.8rem); line-height: 1.25; }
+.intro p { color: var(--muted); font-size: 1.1rem; }
+.layout { display: grid; gap: 1.5rem; align-items: start; }
+@media (min-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2.5rem; } .results-col { position: sticky; top: 1.5rem; } }
+
+/* 조건 */
+.form { background: var(--surface); border: 2px solid var(--line); border-radius: 1.5rem; padding: 1.5rem 1.25rem; display: flex; flex-direction: column; gap: 1.75rem; min-width: 0; }
+@media (min-width: 640px) { .form { padding: 2rem; } }
+.group { display: flex; flex-direction: column; gap: .7rem; border: 0; margin: 0; padding: 0; min-width: 0; border-radius: 1rem; transition: box-shadow .2s, background .2s; }
+.group legend { padding: 0; font-weight: 700; font-size: 1.25rem; display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .6rem; }
+.group legend .req { font-size: .9rem; font-weight: 700; color: var(--accent); }
+.group legend .opt { font-size: .9rem; font-weight: 500; color: var(--muted); }
+.group .hint { font-size: 1rem; color: var(--muted); margin-top: -.2rem; }
+.group.need { background: var(--yolk-soft); box-shadow: 0 0 0 .75rem var(--yolk-soft), 0 0 0 calc(.75rem + 2px) var(--yolk-line); }
+.chips { display: flex; flex-wrap: wrap; gap: .55rem; }
+.chip {
+  min-height: 3rem; padding: .35rem 1.1rem; border-radius: 999px; cursor: pointer;
+  background: var(--surface); border: 2px solid var(--line); font-size: 1.1rem; font-weight: 500;
+  display: inline-flex; align-items: center; gap: .45rem; transition: background .15s, border-color .15s;
+}
+.chip:hover { border-color: var(--accent); }
+.chip .tick { width: 1.1rem; height: 1.1rem; display: none; }
+.chip[aria-checked="true"], .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.chip[aria-checked="true"] .tick, .chip[aria-pressed="true"] .tick { display: inline-block; }
+
+.actions { display: flex; flex-direction: column; gap: .75rem; }
+.cta {
+  width: 100%; min-height: 4rem; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--accent); color: var(--accent-ink); font-size: 1.35rem; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; gap: .6rem;
+  box-shadow: 0 .5rem 1.5rem -0.5rem color-mix(in srgb, var(--accent) 60%, transparent);
+  transition: transform .15s;
+}
+.cta:hover { transform: translateY(-2px); }
+.cta svg { width: 1.35rem; height: 1.35rem; }
+
+/* 개선 1: 휴대전화·태블릿(960px 미만)에서는 추천 버튼을 화면 아래에 고정 */
+@media (max-width: 959px) {
+  body { padding-bottom: 6.5rem; }
+  .actions {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    padding-top: .75rem;
+    padding-bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: color-mix(in srgb, var(--bg) 94%, transparent);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -0.5rem 1.5rem -1rem color-mix(in srgb, var(--ink) 30%, transparent);
+  }
+  .actions .cta { max-width: 36rem; margin: 0 auto; min-height: 3.6rem; }
+  .actions .cta:hover { transform: none; }
+}
+
+/* 안내 (노른자색, 팝업 없음) */
+.notice { background: var(--yolk-soft); border: 2px solid var(--yolk-line); border-radius: 1rem; padding: .85rem 1.1rem; font-size: 1.05rem; font-weight: 500; display: flex; gap: .7rem; align-items: flex-start; }
+.notice::before { content: "!"; flex: none; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--yolk); color: #18241C; display: grid; place-items: center; font-weight: 700; font-size: 1rem; margin-top: .1rem; }
+
+/* 결과 */
+.results-col { min-width: 0; scroll-margin-top: 1rem; }
+.results { display: flex; flex-direction: column; gap: 1rem; transition: opacity .2s; }
+.results.stale .cards, .results.stale .summary, .results.stale .common { opacity: .4; }
+.empty { border: 3px dashed var(--line); border-radius: 1.5rem; padding: 2.5rem 1.5rem; text-align: center; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: .75rem; }
+.empty .bowl { width: 3.5rem; height: 3.5rem; }
+.empty strong { color: var(--ink); font-size: 1.2rem; }
+.res-head { display: flex; flex-direction: column; gap: .35rem; }
+.res-head h2 { font-size: clamp(1.6rem, 3vw, 2rem); }
+.summary { font-size: 1rem; color: var(--muted); }
+/* 개선 2: 세 메뉴에 공통인 이유는 한 번만 */
+.common { display: flex; gap: .55rem; align-items: flex-start; font-size: 1.05rem; font-weight: 500; color: var(--ink); background: var(--ph); border-radius: 1rem; padding: .7rem 1rem; }
+.common svg { flex: none; width: 1.3rem; height: 1.3rem; color: var(--accent); margin-top: .2rem; }
+.cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .9rem; counter-reset: c; }
+.card { background: var(--surface); border: 2px solid var(--line); border-radius: 1.4rem; padding: 1.25rem 1.4rem; display: grid; grid-template-columns: auto 1fr; gap: .3rem 1.1rem; align-items: baseline; animation: rise .3s ease both; }
+.card:nth-child(2) { animation-delay: .06s; } .card:nth-child(3) { animation-delay: .12s; }
+@keyframes rise { from { transform: translateY(6px); opacity: .6; } to { transform: none; opacity: 1; } }
+.card::before { counter-increment: c; content: counter(c); grid-row: span 3; font: 400 2.1rem/1 var(--font-display); color: var(--accent); }
+.card .name-row { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .7rem; }
+.card h3 { font-size: 1.45rem; line-height: 1.35; }
+.card .kind { font-size: .9rem; font-weight: 700; color: var(--accent); background: var(--ph); border-radius: .5rem; padding: 0 .55rem; }
+.card .price { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.card .price small { font-size: .95rem; font-weight: 500; color: var(--muted); margin-left: .4rem; }
+.card .why { color: var(--muted); font-size: 1.05rem; }
+.res-actions { display: flex; flex-wrap: wrap; gap: .7rem; }
+.btn2 {
+  flex: 1 1 12rem; min-height: 3.4rem; border-radius: 999px; cursor: pointer; font-size: 1.15rem; font-weight: 700;
+  background: var(--surface); color: var(--accent); border: 2px solid var(--accent);
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+}
+.btn2:hover { background: var(--ph); }
+.btn2 svg { width: 1.2rem; height: 1.2rem; }
+.data-note { font-size: .95rem; color: var(--muted); margin-top: .5rem; }
+
+footer { border-top: 2px solid var(--line); padding-block: 2rem; color: var(--muted); font-size: 1rem; }
+.foot-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem 2rem; }
+.foot-row a { color: var(--accent); font-weight: 700; text-underline-offset: .25em; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-row">
+    <a class="brand" href="index.html" aria-label="오늘 점심 뭐먹지 홈으로"><span class="dot" aria-hidden="true"></span>오늘 점심 뭐먹지</a>
+    <nav class="nav" aria-label="주 메뉴">
+      <a href="index.html">홈</a><a href="how-to.html">이용 방법</a><a href="example.html">추천 예시</a><a href="app.html" aria-current="page">메뉴 추천</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="intro">
+      <h1>모두의 조건으로 점심 메뉴 3개 받기</h1>
+      <p>조건을 고르고 ‘메뉴 추천받기’를 누르세요.</p>
+    </div>
+
+    <div class="layout">
+      <!-- 조건 -->
+      <div class="form" id="form" role="group" aria-label="조건 선택">
+        <fieldset class="group" id="g-budget">
+          <legend>예산 <span class="req">꼭 골라 주세요</span></legend>
+          <p class="hint">함께 먹는 사람 중 가장 낮은 예산을 고르세요.</p>
+          <div class="chips" role="radiogroup" aria-label="예산" data-name="budget" data-type="single"></div>
+          <p class="notice" id="form-notice" role="status" aria-live="polite" hidden></p>
+        </fieldset>
+
+        <fieldset class="group" id="g-time">
+          <legend>시간</legend>
+          <div class="chips" role="radiogroup" aria-label="시간" data-name="time" data-type="single"></div>
+        </fieldset>
+
+        <fieldset class="group" id="g-kind">
+          <legend>음식 종류 <span class="opt">여러 개 선택 · 안 고르면 전부</span></legend>
+          <div class="chips" data-name="kinds" data-type="multi"></div>
+        </fieldset>
+
+        <fieldset class="group" id="g-exclude">
+          <legend>제외 음식 <span class="opt">여러 개 선택 · 안 고르면 제외 없음</span></legend>
+          <div class="chips" data-name="excludes" data-type="multi"></div>
+        </fieldset>
+
+        <div class="actions">
+          <button type="button" class="cta" id="btn-recommend">메뉴 추천받기
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- 결과 -->
+      <section class="results-col" id="results-col" aria-labelledby="res-title" tabindex="-1">
+        <div class="results" id="results">
+          <div class="empty" id="empty">
+            <svg class="bowl" viewBox="0 0 64 64" aria-hidden="true">
+              <path d="M8 30h48a24 24 0 0 1-48 0z" fill="var(--accent)"/>
+              <path d="M14 30c2-8 10-12 18-12s16 4 18 12z" fill="var(--yolk)"/>
+              <path d="M24 12c0-3 3-3 3-6M34 12c0-3 3-3 3-6" stroke="var(--muted)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            </svg>
+            <strong id="res-title">추천 메뉴가 여기에 나와요</strong>
+            <p>조건을 고르고 ‘메뉴 추천받기’를 누르면<br>메뉴 3개를 예상 가격, 추천 이유와 함께 보여드려요.</p>
+          </div>
+
+          <div id="filled" hidden>
+            <div class="res-head">
+              <h2 id="res-heading">추천 메뉴</h2>
+              <p class="summary" id="summary"></p>
+            </div>
+          </div>
+          <p class="common" id="common" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg><span id="common-text"></span></p>
+          <p class="notice" id="res-notice" role="status" aria-live="polite" hidden></p>
+          <ol class="cards" id="cards" hidden></ol>
+          <div class="res-actions" id="res-actions" hidden>
+            <button type="button" class="btn2" id="btn-again">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
+              다시 추천받기
+            </button>
+            <button type="button" class="btn2" id="btn-change">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h6"/></svg>
+              조건 바꾸기
+            </button>
+          </div>
+          <p class="data-note">메뉴와 가격은 실습용 예시 자료예요. 실제 가격과 다를 수 있어요.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap foot-row">
+    <span>오늘 점심 뭐먹지</span>
+    <a href="index.html">홈으로 돌아가기</a>
+  </div>
+</footer>
+
+<script>
+/* ===== 자료 (실습용 예시) ===== */
+const MENUS = [
+  // 이름, 종류, 최소가, 최대가, 30분 안에, 매운 음식, 해산물, 튀김
+  ["비빔밥", "한식", 8000, 10000, true, false, false, false],
+  ["불고기 덮밥", "한식", 7000, 9000, true, false, false, false],
+  ["닭곰탕", "한식", 8000, 10000, true, false, false, false],
+  ["김치찌개", "한식", 8000, 10000, true, true, false, false],
+  ["제육볶음", "한식", 9000, 11000, true, true, false, false],
+  ["갈비탕", "한식", 13000, 15000, false, false, false, false],
+  ["김밥", "분식", 4000, 6000, true, false, false, false],
+  ["라면", "분식", 5000, 7000, true, true, false, false],
+  ["떡볶이", "분식", 5000, 7000, true, true, false, false],
+  ["돈가스 정식", "분식", 8000, 10000, true, false, false, true],
+  ["짜장면", "중식", 6000, 8000, true, false, false, false],
+  ["볶음밥", "중식", 7000, 9000, true, false, false, false],
+  ["짬뽕", "중식", 9000, 11000, true, true, true, false],
+  ["우동", "일식", 6000, 8000, true, false, true, false],
+  ["규동", "일식", 8000, 10000, true, false, false, false],
+  ["가츠동", "일식", 9000, 11000, true, false, false, true],
+  ["초밥", "일식", 13000, 15000, false, false, true, false],
+  ["샌드위치", "양식", 6000, 8000, true, false, false, false],
+  ["햄버거 세트", "양식", 8000, 10000, true, false, false, true],
+  ["토마토 파스타", "양식", 11000, 13000, false, false, false, false],
+].map(([name, kind, min, max, fast, spicy, seafood, fried]) => ({ name, kind, min, max, fast, spicy, seafood, fried }));
+
+const OPTIONS = {
+  budget: [["8000", "8천 원 이하"], ["10000", "1만 원 이하"], ["12000", "1만 2천 원 이하"], ["15000", "1만 5천 원 이하"]],
+  time: [["fast", "30분 안에 빨리"], ["relaxed", "여유 있게"]],
+  kinds: [["한식", "한식"], ["분식", "분식"], ["중식", "중식"], ["일식", "일식"], ["양식", "양식"]],
+  excludes: [["spicy", "매운 음식"], ["seafood", "해산물"], ["fried", "튀김"]],
+};
+const EXCLUDE_LABEL = { spicy: "매운 음식", seafood: "해산물", fried: "튀김" };
+
+/* ===== 상태 (저장하지 않음: 새로고침하면 처음 상태) ===== */
+const state = { budget: null, time: "relaxed", kinds: [], excludes: [] };
+let lastKey = null;          // 마지막으로 추천한 조건
+let shown = new Set();       // 이 조건에서 이미 보여준 메뉴
+let lastPress = 0;           // 반복 누름 방지
+
+const $ = (id) => document.getElementById(id);
+const won = (n) => n.toLocaleString("ko-KR") + "원";
+const TICK = '<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
+
+/* ===== 조건 버튼 만들기 ===== */
+document.querySelectorAll(".chips").forEach((box) => {
+  const name = box.dataset.name, single = box.dataset.type === "single";
+  OPTIONS[name].forEach(([value, label]) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.dataset.value = value; b.id = `opt-${name}-${value}`;
+    b.innerHTML = TICK + `<span>${label}</span>`;
+    if (single) b.setAttribute("role", "radio");
+    b.addEventListener("click", () => choose(name, value, single));
+    box.appendChild(b);
+  });
+});
+
+function choose(name, value, single) {
+  if (single) {
+    state[name] = value;               // 이미 고른 것을 다시 눌러도 해제하지 않음 (상황 8)
+  } else {
+    const list = state[name];
+    const i = list.indexOf(value);
+    if (i >= 0) list.splice(i, 1); else list.push(value);
+  }
+  if (name === "budget") { $("g-budget").classList.remove("need"); hide($("form-notice")); }
+  paint();
+  markStale();
+}
+
+function paint() {
+  document.querySelectorAll(".chips").forEach((box) => {
+    const name = box.dataset.name, single = box.dataset.type === "single";
+    box.querySelectorAll(".chip").forEach((b) => {
+      const on = single ? state[name] === b.dataset.value : state[name].includes(b.dataset.value);
+      b.setAttribute(single ? "aria-checked" : "aria-pressed", on ? "true" : "false");
+    });
+  });
+}
+
+const keyOf = () => JSON.stringify([state.budget, state.time, [...state.kinds].sort(), [...state.excludes].sort()]);
+
+/* 결과를 본 뒤 조건만 바꾼 경우 (상황 7) */
+function markStale() {
+  if (lastKey === null) return;
+  const stale = keyOf() !== lastKey;
+  $("results").classList.toggle("stale", stale);
+  if (stale) show($("res-notice"), "조건이 바뀌었어요. ‘메뉴 추천받기’를 눌러 새 결과를 확인하세요.");
+  else hide($("res-notice"));
+}
+
+function show(el, text) { el.textContent = text; el.hidden = false; }
+function hide(el) { el.hidden = true; el.textContent = ""; }
+
+/* ===== 거르기 ===== */
+function filterMenus() {
+  const budget = Number(state.budget);
+  return MENUS.filter((m) =>
+    m.max <= budget &&
+    (state.time !== "fast" || m.fast) &&
+    (state.kinds.length === 0 || state.kinds.includes(m.kind)) &&
+    !state.excludes.some((x) => m[x])
+  );
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+/* ===== 추천 이유 ===== */
+// 추천 메뉴 모두에 해당하는 이유: 결과 위에 한 번만 표시
+function commonReason() {
+  const order = ["spicy", "seafood", "fried"].filter((x) => state.excludes.includes(x));
+  const noX = order.map((x) => EXCLUDE_LABEL[x]).join("·");
+  const fast = state.time === "fast";
+  if (order.length && fast) return `모두 ${noX} 없이, 30분 안에 먹기 좋은 메뉴예요.`;
+  if (order.length) return `모두 ${noX} 없이 먹을 수 있어요.`;
+  if (fast) return "모두 30분 안에 먹기 좋은 메뉴예요.";
+  return "";
+}
+// 메뉴마다 다른 이유: 카드에 표시
+function reason(m) {
+  return `예상 가격이 ${won(m.max)} 이하라 예산 안에 들어가요.`;
+}
+
+function summaryText() {
+  const b = OPTIONS.budget.find(([v]) => v === state.budget)[1];
+  const t = OPTIONS.time.find(([v]) => v === state.time)[1];
+  const k = state.kinds.length ? OPTIONS.kinds.filter(([v]) => state.kinds.includes(v)).map(([, l]) => l).join(", ") : "모든 종류";
+  const e = state.excludes.length ? "제외: " + ["spicy", "seafood", "fried"].filter((x) => state.excludes.includes(x)).map((x) => EXCLUDE_LABEL[x]).join(", ") : "제외 없음";
+  return `${b} · ${t} · ${k} · ${e}`;
+}
+
+/* ===== 추천 ===== */
+function recommend() {
+  const now = Date.now();
+  if (now - lastPress < 500) return;   // 빠른 반복 누름은 한 번으로 (상황 6)
+  lastPress = now;
+
+  // 예산을 안 골랐을 때 (상황 1)
+  if (!state.budget) {
+    const g = $("g-budget");
+    g.classList.add("need");
+    show($("form-notice"), "예산을 먼저 골라 주세요. 함께 먹는 사람 중 가장 낮은 예산을 고르면 돼요.");
+    g.scrollIntoView({ block: "center" });
+    g.querySelector(".chip").focus({ preventScroll: true });
+    return;
+  }
+  hide($("form-notice"));
+
+  const key = keyOf();
+  const repeat = key === lastKey;
+  if (!repeat) shown = new Set();
+  lastKey = key;
+
+  const pool = filterMenus();
+  let picks = [], note = "";
+
+  if (pool.length === 0) {
+    // 결과 없음 (상황 2)
+    note = "조건에 맞는 메뉴가 없어요. 예산을 올리거나 제외 음식을 줄여 보세요.";
+  } else if (pool.length <= 3) {
+    picks = shuffle(pool);
+    if (repeat) note = "이 조건에서는 이 메뉴들이 전부예요. 다른 메뉴를 보려면 조건을 바꿔 보세요.";   // 상황 4
+    else if (pool.length < 3) note = `조건에 맞는 메뉴가 ${pool.length}개예요. 더 보려면 음식 종류를 늘리거나 예산을 올려 보세요.`;   // 상황 3
+  } else {
+    let unseen = pool.filter((m) => !shown.has(m.name));
+    if (unseen.length === 0) {
+      // 후보를 모두 본 경우 (상황 5)
+      shown = new Set();
+      unseen = pool;
+      note = "조건에 맞는 메뉴를 모두 보여드렸어요. 처음부터 다시 섞어서 보여드릴게요.";
+    }
+    picks = shuffle(unseen).slice(0, 3);
+    if (picks.length < 3) {
+      const fill = shuffle(pool.filter((m) => !picks.includes(m))).slice(0, 3 - picks.length);
+      picks = picks.concat(fill);
+    }
+  }
+  picks.forEach((m) => shown.add(m.name));
+  render(picks, note);
+}
+
+function render(picks, note) {
+  $("empty").hidden = true;
+  $("filled").hidden = false;
+  $("results").classList.remove("stale");
+  $("summary").textContent = summaryText();
+  $("res-heading").textContent = picks.length ? `추천 메뉴 ${picks.length}개` : "추천 메뉴";
+
+  const cards = $("cards");
+  cards.innerHTML = "";
+  picks.forEach((m) => {
+    const li = document.createElement("li");
+    li.className = "card";
+    li.innerHTML = `
+      <div class="name-row"><h3></h3><span class="kind"></span></div>
+      <p class="price"><span class="p"></span><small>예상 가격</small></p>
+      <p class="why"></p>`;
+    li.querySelector("h3").textContent = m.name;
+    li.querySelector(".kind").textContent = m.kind;
+    li.querySelector(".p").textContent = `${won(m.min)}~${won(m.max)}`.replace("원~", "~");
+    li.querySelector(".why").textContent = reason(m);
+    cards.appendChild(li);
+  });
+  cards.hidden = picks.length === 0;
+  let common = picks.length ? commonReason() : "";
+  if (picks.length === 1) common = common.replace(/^모두 /, "");   // 메뉴가 1개면 '모두'를 빼고 표시
+  $("common-text").textContent = common;
+  $("common").hidden = !common;
+
+  if (note) show($("res-notice"), note); else hide($("res-notice"));
+  $("res-actions").hidden = false;
+  $("btn-again").hidden = picks.length === 0;   // 결과가 없으면 '조건 바꾸기'만
+
+  // 결과가 화면 밖이면 결과로 이동 (상황 9)
+  const col = $("results-col");
+  const r = col.getBoundingClientRect();
+  if (r.top < 0 || r.top > window.innerHeight * 0.6) col.scrollIntoView({ block: "start" });
+}
+
+// 양식 제출(submit)을 쓰지 않고 버튼 클릭으로 바로 실행: 제출이 막힌 환경에서도 작동
+$("btn-recommend").addEventListener("click", recommend);
+$("btn-again").addEventListener("click", recommend);
+$("btn-change").addEventListener("click", () => {   // 상황 10: 고른 조건은 그대로
+  $("form").scrollIntoView({ block: "start" });
+  $("form").querySelector(".chip").focus({ preventScroll: true });
+});
+
+paint();
+</script>
+</body>
+</html>
